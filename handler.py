@@ -2,6 +2,7 @@ import json
 import os
 import boto3
 import decimal
+import requests
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
@@ -30,12 +31,21 @@ def create_response(statusCode, message):
 # Helper class to convert a DynamoDB item to JSON.
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):
+        if isinstance(o, set):
+            return list(o)
         if isinstance(o, decimal.Decimal):
             if o % 1 > 0:
                 return float(o)
             else:
                 return int(o)
         return super(DecimalEncoder, self).default(o)
+
+def removeProjectFromCalendarEvents(list_of_event_ids):
+    calendarURL = "https://calendar.photonranch.org/dev/remove-project-from-events"
+    requestBody = json.dumps({
+        "events": list_of_event_ids
+    })
+    requests.post(calendarURL, requestBody)
 
 
 #=========================================#
@@ -104,7 +114,6 @@ def getAllProjects(event, context):
         import requests
         url = "https://projects.photonranch.org/dev/get-all-projects"
         all_projects = requests.post(url).json()
-
     '''
 
     table = dynamodb.Table(projects_table)
@@ -150,6 +159,61 @@ def getUserProjects(event, context):
     user_projects = json.dumps(response['Items'], cls=DecimalEncoder)
 
     return create_response(200, user_projects)
+
+def addProjectEvent(event, context):
+    '''
+    Projects keep a list of events that they are scheduled with. 
+    This way, if a project is deleted, it can be removed from any associated events.
+
+    This method will add the provided event to the project's list of events.
+
+    We could use a set in dynamodb to keep track of associated events. But that
+    gets complicated because JSON does not support sets, so we would need lots
+    of custom modifier code throughout the pipeline. 
+
+    Instead we'll keep it simple with a list. Get the list, check if already 
+    contains our event, and add it if not, then update dynamodb. 
+    '''
+
+    request_body = json.loads(event.get("body", ""))
+    table = dynamodb.Table(projects_table)
+
+    print("event_body:")
+    print(request_body)
+
+    project_name = request_body["project_name"]
+    created_at = request_body["created_at"]
+    event_id = request_body["event_id"] # ID of the calendar event
+
+    response = table.get_item(
+        Key={
+            "project_name": project_name,
+            "created_at": created_at
+        },
+    )
+    events_list = response['Item']['scheduled_with_events']
+
+    # Don't add a duplicate
+    if event_id in events_list:
+        return create_response(200, 'Event already associated with this project')
+
+    # Add the event to the list and then update the project in dynamodb
+    else:
+        events_list.append(event_id)
+        print(f"events_list: {events_list}")
+
+        update_response = table.update_item(
+            Key={
+                "project_name": project_name,
+                "created_at": created_at,
+            },
+            UpdateExpression="SET scheduled_with_events = :swe",
+            ExpressionAttributeValues={
+                ":swe": events_list
+            }
+        )
+        return create_response(200, 'Successfully associated event with project.')
+
 
 def addProjectData(event, context):
     '''
@@ -220,7 +284,7 @@ def addProjectData(event, context):
 
 def deleteProject(event, context):
 
-    event_body = json.loads(event.get("body", ""))
+    request_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
 
     print("event")
@@ -239,10 +303,28 @@ def deleteProject(event, context):
     print(f"requesterIsAdmin: {requesterIsAdmin}")
 
     # Specify the event with our pk (project_name) and sk (created_at)
-    project_name = event_body['project_name']
-    created_at = event_body['created_at']
+    project_name = request_body['project_name']
+    created_at = request_body['created_at']
+
+    # Get the project we want to delete so we can remove it from all its
+    # scheduled calendar events.
+    event_response = table.get_item(
+        Key={
+            "project_name": project_name,
+            "created_at": created_at
+        },
+    )
+    associated_events = event_response['Item']['scheduled_with_events']
+
+    # Don't remove project from calendar events if the user is not authorized
+    if requesterIsAdmin or userMakingThisRequest==event_response['Item']['user_id']:
+        print("removing projects from calendar events: ")
+        print(associated_events)
+        removeProjectFromCalendarEvents(associated_events)
+
 
     try:
+        # Now we can delete the item
         response = table.delete_item(
             Key={
                 "project_name": project_name,

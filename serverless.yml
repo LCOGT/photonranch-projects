@@ -206,6 +206,23 @@ functions:
               - X-Amz-User-Agent
               - Access-Control-Allow-Origin
               - Access-Control-Allow-Credentials
+  addProjectEvent:
+    handler: handler.addProjectEvent
+    events:
+      - http:
+          path: add-project-event
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Access-Control-Allow-Origin
+              - Access-Control-Allow-Credentials
   deleteProject:
     handler: handler.deleteProject
     events:
