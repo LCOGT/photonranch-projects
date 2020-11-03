@@ -3,6 +3,7 @@ import os
 import boto3
 import decimal
 import requests
+
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
@@ -34,7 +35,7 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(o, set):
             return list(o)
         if isinstance(o, decimal.Decimal):
-            if o % 1 > 0:
+            if o % 1 != 0:
                 return float(o)
             else:
                 return int(o)
@@ -49,9 +50,119 @@ def removeProjectFromCalendarEvents(list_of_event_ids):
 
 
 #=========================================#
-#=======       API Endpoints      ========#
+#=======       Core Methods       ========#
 #=========================================#
+    
+def modify_project(project_name: str, created_at: str, project_changes: dict):
+    """
+    Modify an exising project.
 
+    Args:
+        project_name (str): name of the existing project we want to modify.
+        created_at (str): utc iso datetime of project creation, used to id 
+            the existing project we want to modify.
+        project_changes (dict): these are the changes we want to apply. The 
+            format of this dict should be the same as if we were adding a new
+            project.
+
+    Returns:
+        dict: contains the following keys:
+            is_successful (bool): whether or not the update worked
+            description (str): optional text to display to the user
+            updated_project (str): the state of the project after the update.
+    """
+
+    table = dynamodb.Table(projects_table)
+
+    old_project = get_project(project_name, created_at)
+
+    # If the project specified by project_name and created_at is not found:
+    if not old_project["project_exists"]: 
+        return {
+            "is_successful": False,
+            "description": "The requested project does not exist.",
+            "updated_project": []
+        }
+
+    # Initialize the dict that will overwrite the existing project in dynamodb.
+    updated_project = old_project["project"]
+
+    # Apply the new project changes we want to make
+    updated_project["project_constraints"] = project_changes["project_constraints"]
+    updated_project["project_name"] = project_changes["project_name"]
+    updated_project["project_note"] = project_changes["project_note"]
+    updated_project["project_targets"] = project_changes["project_targets"]
+    updated_project["scheduled_with_events"] = project_changes["scheduled_with_events"]
+
+    # A tricky detail is how to keep track of existing project data for 
+    # exposure requests that have been modified. 
+
+    # Note: this treats identical exposure requests with different image counts 
+    # as different reqeusts. In other words, editing a project by increasing the
+    # number of images for some exposure will start from scratch, ignoring 
+    # any previously gathered data. 
+
+    # initialize a new array to store identifiers for completed project data
+    updated_project_data = [[] for x in range(len(project_changes["exposures"]))]
+    updated_remaining_data = [exposure["count"] for exposure in project_changes["exposures"]]
+
+    # For each exposure request, try to match it with an existing exposure 
+    # request. If they match, then 'import' the associated data into the 
+    # updated_project_data array. 
+    for new_index, new_exposure in enumerate(project_changes["exposures"]):
+        for old_index, old_exposure in enumerate(old_project["project"]["exposures"]):
+            if new_exposure == old_exposure: 
+                updated_project_data[new_index] = old_project["project"]["project_data"][old_index]
+                updated_remaining_data[new_index] = old_project["project"]["remaining"][old_index]
+                break                   
+
+    # Finally, add the updated_project_data array to the udpated_project dict.
+    updated_project["project_data"] = updated_project_data
+    updated_project["remaining"] = updated_remaining_data
+    updated_project["exposures"] = project_changes["exposures"]
+
+    # Delete the existing project from the table
+    table.delete_item(
+        Key={
+            "project_name": project_name,
+            "created_at": created_at
+        },
+    )
+    # Add the updated project back
+    dynamodb_entry = json.loads(json.dumps(updated_project, cls=DecimalEncoder), parse_float=decimal.Decimal)
+    table_response = table.put_item(Item=dynamodb_entry)
+    return {
+        "is_successful": True,
+        "description": "Project has been updated.",
+        "updated_project": table_response,
+    }
+        
+    
+
+def get_project(project_name, created_at):
+    table = dynamodb.Table(projects_table)
+
+    response = table.get_item(
+        Key={
+            "project_name": project_name,
+            "created_at": created_at,
+        }
+    )
+    if 'Item' in response:
+        return {
+            "project_exists": True,
+            "project": response['Item']
+        }
+    else: 
+        return {
+            "project_exists": False,
+            "project": []
+        }
+
+
+#=========================================#
+#=======          Handlers        ========#
+#=========================================#
 def addNewProject(event, context):
     
     event_body = json.loads(event.get("body", ""))
@@ -75,7 +186,10 @@ def addNewProject(event, context):
                 },
             }
 
-    table_response = table.put_item(Item=event_body)
+    # Convert floats into decimals for dynamodb
+    dynamodb_entry = json.loads(json.dumps(event_body), parse_float=decimal.Decimal)
+
+    table_response = table.put_item(Item=dynamodb_entry)
 
     message = json.dumps({
         'table_response': table_response,
@@ -83,7 +197,21 @@ def addNewProject(event, context):
     })
     return create_response(200, message)
 
-def getProject(event, context):
+def modify_project_handler(event, context):
+
+    table = dynamodb.Table(projects_table)
+    event_body = json.loads(event.get("body", ""))
+    print(event_body)
+
+    project_name = event_body['project_name']
+    created_at = event_body['created_at']
+    project_changes = event_body['project_changes']
+
+    response = modify_project(project_name, created_at, project_changes)
+    return create_response(200, json.dumps(response, cls=DecimalEncoder))
+
+
+def get_project_handler(event, context):
 
     event_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
@@ -94,16 +222,10 @@ def getProject(event, context):
     project_name = event_body['project_name']
     created_at = event_body['created_at']
 
-    response = table.get_item(
-        Key={
-            "project_name": project_name,
-            "created_at": created_at,
-        }
-    )
-    print(f"getProject response: {response}")
-    if 'Item' in response:
-        project = json.dumps(response['Item'], cls=DecimalEncoder)
-        return create_response(200, project)
+    project = get_project(project_name, created_at)
+    if project["project_exists"]:
+        project_json = json.dumps(project["project"], cls=DecimalEncoder)
+        return create_response(200, project_json)
     else: 
         return create_response(404, "Project not found.")
 
@@ -159,6 +281,7 @@ def getUserProjects(event, context):
     user_projects = json.dumps(response['Items'], cls=DecimalEncoder)
 
     return create_response(200, user_projects)
+
 
 def addProjectEvent(event, context):
     '''
@@ -233,7 +356,6 @@ def addProjectData(event, context):
     created_at = event_body["created_at"]
 
     # Indices for where to save the new data in project_data
-    target_index = event_body["target_index"]
     exposure_index = event_body["exposure_index"]
 
     # Data to save
@@ -241,8 +363,8 @@ def addProjectData(event, context):
 
 
     # First, get the 'project_data' and 'remaining' arrays we want to update
-    # 'project_data[target_index][exposure_index]' stores filenames of completed exposures
-    # 'remaining[target_index][exposure_index[' is the number of exposures remaining
+    # 'project_data[exposure_index]' stores filenames of completed exposures
+    # 'remaining[exposure_index[' is the number of exposures remaining
     resp1 = table.get_item(
         Key={
             "project_name": project_name,
@@ -253,8 +375,8 @@ def addProjectData(event, context):
     remaining = resp1["Item"]["remaining"]
 
     # Next, add our new information
-    project_data[target_index][exposure_index].append(base_filename)
-    remaining[target_index][exposure_index] = int(remaining[target_index][exposure_index]) - 1
+    project_data[exposure_index].append(base_filename)
+    remaining[exposure_index] = int(remaining[exposure_index]) - 1
 
     print("updated values: ")
     print(project_data)

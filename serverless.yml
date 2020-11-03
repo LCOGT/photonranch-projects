@@ -22,6 +22,7 @@ custom:
   # This is the 'variable' for the customDomain.basePath value, based on the stage.
   # Run as `sls deploy --stage <stage_name>`
   stage:
+    prod: prod
     dev: dev
     test: test 
 
@@ -169,8 +170,15 @@ functions:
               - X-Amz-User-Agent
               - Access-Control-Allow-Origin
               - Access-Control-Allow-Credentials
+  modifyProject:
+    handler: handler.modify_project_handler
+    events:
+      - http:
+          path: modify-project
+          method: post
+          cors: true
   getProject:
-    handler: handler.getProject
+    handler: handler.get_project_handler
     events:
       - http:
           path: get-project
