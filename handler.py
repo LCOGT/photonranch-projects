@@ -92,6 +92,7 @@ def modify_project(project_name: str, created_at: str, project_changes: dict):
     updated_project["project_name"] = project_changes["project_name"]
     updated_project["project_note"] = project_changes["project_note"]
     updated_project["project_targets"] = project_changes["project_targets"]
+    updated_project["project_sites"] = project_changes["project_sites"]
     updated_project["scheduled_with_events"] = project_changes["scheduled_with_events"]
 
     # A tricky detail is how to keep track of existing project data for 
