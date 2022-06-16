@@ -13,10 +13,13 @@ plugins:
   - serverless-dynamodb-pitr
   - serverless-domain-manager
 
-# Enable point-in-time-recovery
 custom:
+
+  projectsTable: projects-${self:custom.stage.${self:provider.stage}}
+
+  # Enable point-in-time-recovery
   pitr:
-    - tableName: ${self:provider.environment.PROJECTS_TABLE}
+    - tableName: ${self:custom.projectsTable}
       enabled: true
 
   # This is the 'variable' for the customDomain.basePath value, based on the stage.
@@ -26,6 +29,12 @@ custom:
     dev: dev
     test: test 
 
+  # Since lambda runs on a linux instance, we need to zip the requirements in a linux docker container.
+  pythonRequirements:
+    dockerizePip: true
+    useDownloadCache: false 
+    useStaticCache: false
+
   customDomain:
     domainName: 'projects.photonranch.org'
     basePath: ${self:custom.stage.${self:provider.stage}}
@@ -34,10 +43,11 @@ custom:
 
 provider:
   name: aws
+  stage: ${opt:stage, "dev"}
   runtime: python3.7
   region: us-east-1
   environment: 
-    PROJECTS_TABLE: photonranch-projects
+    PROJECTS_TABLE: ${self:custom.projectsTable}
     AUTH0_CLIENT_ID: ${file(./secrets.json):AUTH0_CLIENT_ID}
     AUTH0_CLIENT_PUBLIC_KEY: ${file(./public_key)}
   iamRoleStatements:
@@ -102,7 +112,7 @@ resources: # CloudFormation template syntax from here on.
     projectsTable: 
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:provider.environment.PROJECTS_TABLE}
+        TableName: ${self:custom.projectsTable}
         AttributeDefinitions:
           - AttributeName: project_name
             AttributeType: S
