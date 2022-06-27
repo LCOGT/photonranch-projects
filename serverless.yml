@@ -5,8 +5,8 @@ service: photonranch-projects
 
 package:
   patterns:
-    - venv/**
-    - node_modules/**
+    - '!venv/**'
+    - '!node_modules/**'
 
 plugins:
   - serverless-python-requirements
@@ -25,7 +25,7 @@ custom:
   # This is the 'variable' for the customDomain.basePath value, based on the stage.
   # Run as `sls deploy --stage <stage_name>`
   stage:
-    prod: projects
+    prod: prod
     dev: dev
     test: test 
 
