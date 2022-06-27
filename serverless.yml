@@ -25,7 +25,7 @@ custom:
   # This is the 'variable' for the customDomain.basePath value, based on the stage.
   # Run as `sls deploy --stage <stage_name>`
   stage:
-    prod: prod
+    prod: projects
     dev: dev
     test: test 
 
@@ -50,6 +50,7 @@ provider:
     PROJECTS_TABLE: ${self:custom.projectsTable}
     AUTH0_CLIENT_ID: ${file(./secrets.json):AUTH0_CLIENT_ID}
     AUTH0_CLIENT_PUBLIC_KEY: ${file(./public_key)}
+    STAGE: ${self:custom.stage.${self:provider.stage}}
   iamRoleStatements:
     - Effect: Allow 
       Action: 
