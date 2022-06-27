@@ -42,7 +42,13 @@ class DecimalEncoder(json.JSONEncoder):
         return super(DecimalEncoder, self).default(o)
 
 def removeProjectFromCalendarEvents(list_of_event_ids):
-    calendarURL = "https://calendar.photonranch.org/dev/remove-project-from-events"
+    # The stage is used in some URLs. The production URL for the calendar
+    # is '...org/calendar...', so check first if the stage is 'prod'.
+    if os.environ['STAGE'] == 'prod':
+        stage = 'calendar'
+    else:
+        stage = os.environ['STAGE']
+    calendarURL = f"https://calendar.photonranch.org/{stage}/remove-project-from-events"
     requestBody = json.dumps({
         "events": list_of_event_ids
     })
