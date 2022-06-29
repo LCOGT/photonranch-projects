@@ -3,13 +3,11 @@ import os
 import boto3
 import decimal
 import requests
-
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
 
 dynamodb = boto3.resource('dynamodb')
-
 projects_table = os.environ['PROJECTS_TABLE']
 
 
@@ -18,6 +16,8 @@ projects_table = os.environ['PROJECTS_TABLE']
 #=========================================#
 
 def create_response(statusCode, message):
+    """Returns a given status code."""
+
     return { 
         'statusCode': statusCode,
         'headers': {
@@ -29,8 +29,10 @@ def create_response(statusCode, message):
         'body': message
     }
 
-# Helper class to convert a DynamoDB item to JSON.
+
 class DecimalEncoder(json.JSONEncoder):
+    """Helper class to convert a DynamoDB item to JSON."""
+
     def default(self, o):
         if isinstance(o, set):
             return list(o)
@@ -41,9 +43,16 @@ class DecimalEncoder(json.JSONEncoder):
                 return int(o)
         return super(DecimalEncoder, self).default(o)
 
+
 def removeProjectFromCalendarEvents(list_of_event_ids):
-    # The stage is used in some URLs. The production URL for the calendar
-    # is '...org/calendar...', so check first if the stage is 'prod'.
+    """Removes a project from associated reservations in the calendar.
+
+    Args:
+        list_of_event_ids (list): ids of calendar events we want to modify
+    """
+    
+    # The development stage is used in some URLs. The production URL for the
+    # calendar is '...org/calendar...', so check first if the stage is 'prod'.
     if os.environ['STAGE'] == 'prod':
         stage = 'calendar'
     else:
@@ -60,12 +69,11 @@ def removeProjectFromCalendarEvents(list_of_event_ids):
 #=========================================#
     
 def modify_project(project_name: str, created_at: str, project_changes: dict):
-    """
-    Modify an exising project.
+    """Modify the selections of an exising project.
 
     Args:
         project_name (str): name of the existing project we want to modify.
-        created_at (str): utc iso datetime of project creation, used to id 
+        created_at (str): UTC ISO datetime of project creation, used to id 
             the existing project we want to modify.
         project_changes (dict): these are the changes we want to apply. The 
             format of this dict should be the same as if we were adding a new
@@ -73,8 +81,8 @@ def modify_project(project_name: str, created_at: str, project_changes: dict):
 
     Returns:
         dict: contains the following keys:
-            is_successful (bool): whether or not the update worked
-            description (str): optional text to display to the user
+            is_successful (bool): whether or not the update worked.
+            description (str): optional text to display to the user.
             updated_project (str): the state of the project after the update.
     """
 
@@ -105,11 +113,11 @@ def modify_project(project_name: str, created_at: str, project_changes: dict):
     # exposure requests that have been modified. 
 
     # Note: this treats identical exposure requests with different image counts 
-    # as different reqeusts. In other words, editing a project by increasing the
+    # as different requests. In other words, editing a project by increasing the
     # number of images for some exposure will start from scratch, ignoring 
     # any previously gathered data. 
 
-    # initialize a new array to store identifiers for completed project data
+    # Initialize a new array to store identifiers for completed project data
     updated_project_data = [[] for x in range(len(project_changes["exposures"]))]
     updated_remaining_data = [exposure["count"] for exposure in project_changes["exposures"]]
 
@@ -138,6 +146,7 @@ def modify_project(project_name: str, created_at: str, project_changes: dict):
     # Add the updated project back
     dynamodb_entry = json.loads(json.dumps(updated_project, cls=DecimalEncoder), parse_float=decimal.Decimal)
     table_response = table.put_item(Item=dynamodb_entry)
+    
     return {
         "is_successful": True,
         "description": "Project has been updated.",
@@ -145,8 +154,17 @@ def modify_project(project_name: str, created_at: str, project_changes: dict):
     }
         
     
-
 def get_project(project_name, created_at):
+    """Retrieves a project's details from the projects database.
+    
+    Args:
+        project_name (str): name of the project we want to retrieve.
+        created_at (str): UTC datetime string of project creation.
+
+    Returns:
+        Project details, if it exists. Otherwise, an empty array.
+    """
+
     table = dynamodb.Table(projects_table)
 
     response = table.get_item(
@@ -170,7 +188,19 @@ def get_project(project_name, created_at):
 #=========================================#
 #=======          Handlers        ========#
 #=========================================#
+
 def addNewProject(event, context):
+    """Adds a new project to the projects DynamoDB database.
+
+    Args:
+        event.body.project_name (str): name of the project we want to add.
+        event.body.user_id (str): Auth0 user 'sub'.
+        event.body.created_at (str): UTC datetime string of project creation.
+
+    Returns:
+        200 status code with project details if successful.
+        400 status code if project missing required keys.
+    """
     
     event_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
@@ -183,15 +213,9 @@ def addNewProject(event, context):
     actual_keys = event_body.keys()
     for key in required_keys:
         if key not in actual_keys:
-            print(f"Error: missing requied key {key}")
-            return {
-                "statusCode": 400,
-                "body": f"Error: missing required key {key}",
-                "headers": {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                },
-            }
+            msg = f"Error: missing required key {key}"
+            print(msg)
+            return create_response(400, msg)
 
     # Convert floats into decimals for dynamodb
     dynamodb_entry = json.loads(json.dumps(event_body), parse_float=decimal.Decimal)
@@ -204,22 +228,39 @@ def addNewProject(event, context):
     })
     return create_response(200, message)
 
+
 def modify_project_handler(event, context):
+    """Handler method to create a response code after modifying a project.
 
-    table = dynamodb.Table(projects_table)
-    event_body = json.loads(event.get("body", ""))
-    print(event_body)
+    Args:
+       
 
-    project_name = event_body['project_name']
-    created_at = event_body['created_at']
-    project_changes = event_body['project_changes']
+    Returns:
+        200 status code with modified project details if successful.
+        400 status code if unsuccessful.
+    """
+    
+    try:
+        event_body = json.loads(event.get("body", ""))
+        print(event_body)
 
-    response = modify_project(project_name, created_at, project_changes)
-    return create_response(200, json.dumps(response, cls=DecimalEncoder))
+        project_name = event_body['project_name']
+        created_at = event_body['created_at']
+        project_changes = event_body['project_changes']
 
+        response = modify_project(project_name, created_at, project_changes)
+        return create_response(200, json.dumps(response, cls=DecimalEncoder))
+    # Something 
+    except Exception as e:
+
+        return create_response(400, json.dumps(e))
 
 def get_project_handler(event, context):
+    """
 
+
+    """
+    
     event_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
 
@@ -237,13 +278,13 @@ def get_project_handler(event, context):
         return create_response(404, "Project not found.")
 
 def getAllProjects(event, context):
-    '''
+    """
     example python code that uses this endpoint:
 
         import requests
         url = "https://projects.photonranch.org/dev/get-all-projects"
         all_projects = requests.post(url).json()
-    '''
+    """
 
     table = dynamodb.Table(projects_table)
 
@@ -258,7 +299,9 @@ def getAllProjects(event, context):
 
 
 def getUserProjects(event, context):
-
+    """
+    """
+    
     event_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
 
@@ -291,7 +334,8 @@ def getUserProjects(event, context):
 
 
 def addProjectEvent(event, context):
-    '''
+    """
+
     Projects keep a list of events that they are scheduled with. 
     This way, if a project is deleted, it can be removed from any associated events.
 
@@ -303,7 +347,7 @@ def addProjectEvent(event, context):
 
     Instead we'll keep it simple with a list. Get the list, check if already 
     contains our event, and add it if not, then update dynamodb. 
-    '''
+    """
 
     request_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
@@ -346,10 +390,10 @@ def addProjectEvent(event, context):
 
 
 def addProjectData(event, context):
-    '''
+    """
     When an observatory captures and uploads an image requested in a project,
     it should use this endpoint to update the projects completion status.
-    '''
+    """
 
     event_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
@@ -412,7 +456,9 @@ def addProjectData(event, context):
 
 
 def deleteProject(event, context):
-
+    """
+    """
+    
     request_body = json.loads(event.get("body", ""))
     table = dynamodb.Table(projects_table)
 
@@ -476,38 +522,4 @@ def deleteProject(event, context):
     message = json.dumps(response, indent=4, cls=DecimalEncoder)
     print(f"success deleting project; message: {message}")
     return create_response(200, message)
-
-
-if __name__=="__main__":
-
-    projects_table = "photonranch-projects"
-
-    time = "2020-05-12T16:40:00Z" # This should be during 'cool cave' at ALI-sim
-    site = "ALI-sim"
-    user_id = "google-oauth2|100354044221813550027"
-
-    event = {
-        "body": json.dumps({
-            "user_id": user_id,
-            "site": site,
-            "time": time
-        })
-    }
-
-    event = {
-        "body": json.dumps({
-            "project_name": "m101",
-            "created_at": "2020-06-24T16:53:56Z",
-            "target_index": 0,
-            "exposure_index": 0,
-            "base_filename": "test_filename",
-        })
-    }
-    addProjectData(event, {})
-
-    #print(isUserScheduled(event, {}))
-    #print(getUserEventsEndingAfterTime(event, {}))
-
-
-
 
