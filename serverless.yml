@@ -144,17 +144,6 @@ resources: # CloudFormation template syntax from here on.
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
-          #- IndexName: site-end-index
-            #KeySchema:
-              #- AttributeName: site
-                #KeyType: HASH
-              #- AttributeName: end
-                #KeyType: RANGE
-            #Projection:
-              #ProjectionType: ALL
-            #ProvisionedThroughput:
-              #ReadCapacityUnits: 1
-              #WriteCapacityUnits: 1
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1

@@ -2,17 +2,19 @@ import json
 import os
 import http.client
 import requests
-
 import jwt
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509 import load_pem_x509_certificate
+
 
 # Set by serverless.yml
 AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
 AUTH0_CLIENT_PUBLIC_KEY = os.getenv('AUTH0_CLIENT_PUBLIC_KEY')
 
 def auth(event, context):
+    """Authorizes a user making requests requiring authorization with Auth0."""
+
     print(f"auth event: {event}")
     whole_auth_token = event.get('authorizationToken')
     if not whole_auth_token:
@@ -40,7 +42,10 @@ def auth(event, context):
         print(f'Exception encountered: {e}')
         raise Exception('Unauthorized')
 
+
 def getUserRoles(auth_token):
+    """Retrieves roles of a user from Auth0."""
+
     # Call the auth0 user management api to get user info
     headers = { 'Authorization': f"Bearer {auth_token}", }
     url = "https://photonranch.auth0.com/userinfo"
@@ -80,14 +85,17 @@ def generate_policy(principal_id, effect, resource, userRoles):
         }
     }
 
+
 def convert_certificate_to_pem(public_key):
     cert_str = public_key.encode()
     cert_obj = load_pem_x509_certificate(cert_str, default_backend())
     pub_key = cert_obj.public_key()
     return pub_key
 
+
 def format_public_key(public_key):
     public_key = public_key.replace('\n', ' ').replace('\r', '')
     public_key = public_key.replace('-----BEGIN CERTIFICATE-----', '-----BEGIN CERTIFICATE-----\n')
     public_key = public_key.replace('-----END CERTIFICATE-----', '\n-----END CERTIFICATE-----')
     return public_key
+
