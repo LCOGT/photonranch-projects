@@ -1,8 +1,8 @@
 asn1crypto==1.5.1
 boto3==1.24.21
-botocore==1.14.9
+botocore==1.27.21
 certifi==2022.6.15
-cffi==1.15.0
+cffi==1.15.1
 chardet==5.0.0
 cryptography==3.3.2
 docutils==0.18.1
