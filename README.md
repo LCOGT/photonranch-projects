@@ -21,6 +21,10 @@ Requests related to the projects backend include:
 
 Projects are designed to store not only the request details, but also pointers to completed images and completion status. In order for this model to work, the site that completes an image for a project request should send the appropriate metadata using the projects APIs. 
 
+### Architecture
+
+An architecture diagram will go here.
+
 ## Dependencies
 
 This application currently runs under Python 3.9. Serverless requirements for deployment are listed in `package.json`. A list of Python dependencies, which the `serverless-python-requirements plugin` zips for the Lambda environment, can be found in `requirements.txt`.
@@ -147,12 +151,12 @@ The body of a project is a JSON object composed with the following syntax.
 
 **exposure_index**: The exposure_index value specifies which of the multiple requested exposures was used for the completed file. 
 
-**base_filename** This is the general filename that is used to get the images completed in a project. Base filenames currently follow a "sitecode-camera_name-date-exp_number" format, such as "saf-sq002me-20220615-00022012", with a reminder that this should not include the EX00 value or the .fits file extensions.
+**base_filename**: This is the general filename that is used to get the images completed in a project. Base filenames currently follow a "sitecode-camera_name-date-exp_number" format, such as "saf-sq002me-20220615-00022012", with a reminder that this should not include the EX00 value or the .fits file extensions.
 
 **target_index (currently not supported)**: When projects used to support multiple targets, the target index behaved like the exposure index, and the project_data had one more level of nesting. Files would save at `project_data[target_index][exposure_index]`. We have opted to remove this feature; however, multi-target project support may be added again in the future.
 
 ## API Endpoints
-Project requests are handled at the base URL `https://projects.photonranch.org/{stage}`, where `{stage}` is the deployment stage in ["test", "dev", "prod"]. Currently, both the production and development stages point to the dev URL, though this may change in the future.
+Project requests are handled at the base URL `https://projects.photonranch.org/{stage}`, where `{stage}` is the deployment stage in ["test", "dev", "prod"]. Currently, both the production and development stages point to the dev URL, though this will change in the future.
 
 For examples using these endpoints with Python, see `examples.py`.
 
