@@ -151,7 +151,6 @@ resources: # CloudFormation template syntax from here on.
 functions:
   authorizerFunc: 
     handler: authorizer.auth
-    cors: true
   addNewProject:
     handler: handler.addNewProject
     events:
