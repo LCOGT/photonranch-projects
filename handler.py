@@ -424,9 +424,10 @@ def addProjectData(event, context):
     Args:
         event.body.project_name (str): Name of the existing project to modify.
         event.body.created_at (str): UTC datetime string of project creation.
-        event.body.exposure_index (list): Filenames of completed exposures.
-        event.body.base_filename (list): New filename strings to add to 
-            the project's data.
+        event.body.exposure_index (int):
+            Index of the most recently completed exposure.
+        event.body.base_filename (str):
+            New filename to add to the project's data.
 
     Returns:
         200 status code if project succesfully updates with image data.

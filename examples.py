@@ -38,7 +38,7 @@ def addProjectData():
 
         # Currently, a project can only have one target,
         # so this value should always be zero.
-        "target_index": 0,
+        # "target_index": 0,
 
         # Specify which exposure request is being added to the project data.
         "exposure_index": 0,

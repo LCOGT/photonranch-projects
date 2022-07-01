@@ -1,233 +1,243 @@
-# photonranch-projects
+# Photon Ranch Projects
 
-*Note: this is a temporary info dump (copied from a slack message) that I thought was worth saving. But an actual readme-type overview is still due.*
+This repository manages the backend service for projects at www.photonranch.org. Communication between requests through the web interface and the projects database operations at AWS occur here.
 
----
+This is a Serverless API deployed by the Serverless Framework, which creates and runs the Python functions in `handler.py` in AWS Lambda.
 
-Two python snippets demonstrating code for observatories to get tasks to do:
+## Description
 
-The first snippet gets all projects. At some point, I’ll make it so you can filter by various conditions (only get unfinished projects, etc). Currently, projects are not linked to any specific site, but that might be a future feature too.
+Photon Ranch supports two main types of observing sessions: real-time and scheduled. Scheduled observing sessions run on projects, which users can create on the web interface at photonranch.org/site/{sitecode}/projects. A project is a JSON object containing the details required to be performed automatically by an observatory. To schedule, projects are added to a [calendar reservation](https://github.com/LCOGT/photonranch-calendar).
 
-```python
-import requests
-url = "https://projects.photonranch.org/dev/get-all-projects"
-all_projects = requests.post(url).json()
-```
+![Interface to create a project at Photon Ranch](images/Project-Form.png)
 
-This next snippet returns all calendar reservations for a site within the given start and end times (UTC).
+Requests related to the projects backend include:
 
-```python
-import requests, json
-url = "https://calendar.photonranch.org/dev/siteevents"
-body = json.dumps({
-    "site": "saf",             
-    # Get events that end between these two UTC times.             
-    "start": "2020-06-01T01:00:00Z",
-    "end": "2020-06-02T01:00:00Z",            
-    # optional: adds the full project to any events that have them. Not including this in the request means you get the project_id only, no details. 
-    "full_project_details": True        
-})
-events = requests.post(url, body).json()
-```
+- Creating a new project
+- Modifying the details of an existing project
+- Deleting a project
+- Retrieving a specific project, a list of projects created by a specific user, or a list of all existing projects
+- Adding a calendar event to a project
+- Updating a project with exposures taken (currently used by observatories)
 
-My thinking is that each afternoon a site can fetch the reservations for that night, and make sure to fulfill them (either working on the associated project and/or prioritizing the user who owns the reservation). The observatory can also fetch incomplete projects, and work on any of them during idle time. I will be adding ways to update the completion of a project as images are taken and uploaded.
+Projects are designed to store not only the request details, but also pointers to completed images and completion status. In order for this model to work, the site that completes an image for a project request should send the appropriate metadata using the projects APIs. 
 
----
+## Dependencies
 
-## Updating Projects with Completed Data
+This application currently runs under Python 3.9. Serverless requirements for deployment are listed in `package.json`. A list of Python dependencies, which the `serverless-python-requirements plugin` zips for the Lambda environment, can be found in `requirements.txt`.
 
+To update npm dependencies, run `npm update`. This will update the package versions in `package-lock.json`.
 
-Projects are designed to store not only the request details, but also pointers to completed images and completion status. 
+## Local Development
 
-In order for this model to work, the site that completes an image for a project request should send the appropriate metadata using the projects api. 
-
-### Example Code
-
-First, here is an example request that illustrates what the update looks like. Note there are five pieces of data that need to be included:
-- project_name
-- created_at
-- target_index
-- exposure_index
-- base_filename
-
-The code will be followed by explanations of these values. 
-
-
-```python
-import requests, json
-
-
-# A project is uniquely specified by the pair of values: project_name and created_at. 
-project_name = "tim test project"
-created_at = "2020-12-17T01:26:10Z"
-
-# Specifies which exposure request the image fulfills
-target_index = 0
-
-# Always 0 (multiple targets are not currently supported)
-exposure_index = 0
-
-base_filename = "file-blue-1"
-    
-    
-# Compile and send the complete request.
-url = "https://projects.photonranch.org/dev/add-project-data"
-request_body = json.dumps({
-    "project_name": project_name,
-    "created_at": created_at,
-    "target_index": target_index,
-    "exposure_index": exposure_index,
-    "base_filename": base_filename,
-})
-#response = requests.post(url, request_body)
-#print(response.json())
+Clone the repository to your local machine:
 
 ```
+git clone https://github.com/LCOGT/photonranch-projects.git
+cd photonranch-projects
+```
 
-### Parameter Details
+### Requirements
 
-#### project_name, created_at
+You will need the [Serverless Framework](https://www.serverless.com/framework/docs/getting-started) installed locally for development. For manual deployment to AWS as well as for updating dependencies, you will need to install [Node](https://nodejs.org/en/), [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm), and [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), configuring with your own AWS credentials.
 
-Projects are uniquely identified by the combination of their name and creation date. You should have these values already if the site has chosen a project to work on. 
+### Deployment
 
-#### exposure_index
-
-Here is how the project stores requested exposures and completed exposures:
+Changes pushed to the test, dev, and main branches are automatically deployed to the corresponding test, dev, and production stages with Github Actions. For manual deployment on your local machine, you'll first need to fill out the `public_key` and `secrets.json` with the required information, and install packages:
 
 ```
-  ...
-  "remaining": [
-    2,
-    3
-  ],
-  "project_data": [
-    [], # no blue images taken yet
-    ["base-filename-for-red-image"] # one red image completed already
-  ],
-  "exposures": [
-    {
-      "filter": "Blue",
-      "area": "FULL",
-      "exposure": 1,
-      "dither": "no",
-      "bin": "2, 2",
-      "count": "2",
-      "photometry": "-",
-      "imtype": "light",
-      "defocus": 0
-    },
-    {
-      "filter": "Red",
-      "area": "FULL",
-      "exposure": 1,
-      "dither": "no",
-      "bin": "2, 2",
-      "count": "4",
-      "photometry": "-",
-      "imtype": "light",
-      "defocus": 0
-    }
-  ],
-  ...
-  ```
-  
-The exposure_index value specifies which of the multiple requested exposures was used for the completed file.
-  
-For example, if the image was an exposure with the red filter, the exposure index would be 1 (corresponding to the second item in the 'exposures' list). Once the request goes through, the appropriate list in 'project_data' would show the new filename. 
-  
+npm install
+serverless plugin install --name serverless-python-requirements
+```
 
-#### target_index
+To deploy, run:
 
-When projects used to support multiple targets, the target index behaved like the exposure index, and the project_data had one more level of nesting (files would save at `project_data[target_index][exposure_index]`).
+```
+serverless deploy --stage {stage}
+```
 
-However, we opted to remove multi-target capabilities, so target_index is always 0. 
+In the case that a Serverless or AWS key has been reset, you will need to update these manually in this repository's settings for Github Actions to continue deploying. You must be a repository collaborator to edit these.
 
-target_index has not been removed because we have plans to add multi-target support back to projects. 
+### Testing
 
-#### base_filename
+Instructions to manually run tests will be detailed here.
 
-This is the general filename that is used to get the images completed in a project. The format is something like:
+## Projects Request Syntax
 
-`wmd-sq01-20201216-00001675`
+The body of a project is a JSON object composed with the following syntax.
 
-with a reminder that this should not include the EX00 value or the .fits file extensions. 
-
-### Example Full Project
-
-For reference, this is what a full project looks like. 
-
-```json
+```javascript
 {
-  "user_id": "google-oauth2|100354044221813550027",
-  "project_constraints": {
-    "meridian_flip": "flip_ok",
+  // Example project
+  "user_id": "google-oauth2|xxxxxxxxxxxxxxxxxxxxx",  // Auth0 user 'sub'
+  "project_constraints": {  // Constraining parameters for automatic scheduling
     "dec_offset_units": "deg",
+    "meridian_flip": "flip_ok",
+    "add_center_to_mosaic": false,
     "close_on_block_completion": false,
-    "site_tags": [
-      "wmd"
-    ],
+    "project_is_active": false,
     "prefer_bessell": false,
+    "dark_sky_setting": false,
     "frequent_autofocus": false,
     "ra_offset": 0,
     "lunar_phase_max": 60,
+    "min_zenith_dist": 0,
     "lunar_dist_min": 30,
-    "max_airmass": 2,
     "enhance_photometry": false,
+    "max_airmass": 2,
     "dec_offset": 0,
+    "generic_instrument": "Main Camera",
     "max_ha": 4,
     "ra_offset_units": "deg",
     "near_tycho_star": false,
     "position_angle": 0
   },
-  "project_name": "tim test project",
-  "scheduled_with_events": [],
-  "created_at": "2020-12-17T01:26:10Z",
-  "remaining": [
-    0,
-    1
+  "project_name": "Trifid SRO Filters",
+  "scheduled_with_events": [],  // Associated calendar reservations
+  "created_at": "2022-04-26T00:56:09Z",
+  "remaining": [  // Number of exposures left to take, for each set of exposures
+    "3",
+    "30"
   ],
-  "project_note": "for adding data",
-  "project_data": [
-    [
-      "file-blue-1",
-      "file-blue-1"
-    ],
-    [
-      "file-red-1",
-      "file-red-1",
-      "file-red-1"
-    ]
+  "project_note": "SRO filters",
+  "project_data": [  // Filenames of completed exposures
+    [],
+    []
   ],
-  "exposures": [
+  "project_sites": [  // Which site to observe or auto-schedule at (planned)
+    "sro"
+  ],
+  "exposures": [  // Details of each exposure request
     {
-      "filter": "Blue",
       "area": "FULL",
-      "exposure": 1,
+      "filter": "PL",
       "dither": "no",
-      "bin": "2, 2",
-      "count": "2",
+      "exposure": "15",
+      "bin": "1, 1",
+      "count": "3",
       "photometry": "-",
       "imtype": "light",
       "defocus": 0
     },
+
     {
-      "filter": "Red",
       "area": "FULL",
-      "exposure": 1,
+      "filter": "HA",
       "dither": "no",
-      "bin": "2, 2",
-      "count": "4",
+      "exposure": "120",
+      "bin": "1, 1",
+      "count": "30",
       "photometry": "-",
       "imtype": "light",
       "defocus": 0
-    }
+    },
   ],
-  "project_targets": [
+  "project_targets": [  // Target name, right ascension, and declinations
     {
-      "name": "M 1",
-      "ra": "5.5755",
-      "dec": "22.0145"
+      "name": "M 20",
+      "dec": "-22.9717",
+      "ra": "18.0450"
     }
   ]
 }
 ```
+
+### Request Parameters
+
+**project_name** and **created_at**: Projects are uniquely identified by the combination of their name and creation date.
+
+**exposure_index**: The exposure_index value specifies which of the multiple requested exposures was used for the completed file. 
+
+**base_filename** This is the general filename that is used to get the images completed in a project. Base filenames currently follow a "sitecode-camera_name-date-exp_number" format, such as "saf-sq002me-20220615-00022012", with a reminder that this should not include the EX00 value or the .fits file extensions.
+
+**target_index (currently not supported)**: When projects used to support multiple targets, the target index behaved like the exposure index, and the project_data had one more level of nesting. Files would save at `project_data[target_index][exposure_index]`. We have opted to remove this feature; however, multi-target project support may be added again in the future.
+
+## API Endpoints
+Project requests are handled at the base URL `https://projects.photonranch.org/{stage}`, where `{stage}` is the deployment stage in ["test", "dev", "prod"]. Currently, both the production and development stages point to the dev URL, though this may change in the future.
+
+For examples using these endpoints with Python, see `examples.py`.
+
+- POST `/new-project`
+  - Description: Adds a new project to the projects database.
+  - Authorization required: No.
+  - Request body:
+    - `project_name` (string): Name of the project to create.
+    - `created_at` (string): UTC datestring at time of project creation.
+    - `user_id` (string): Auth0 user 'sub' of the user creating the project.
+    - `new_project` (dict):
+  - Responses:
+    - 200: Successfully added new project.
+    - 400: Missing required key in `[project_name, user_id, created_at]`.
+
+- POST `/modify-project`
+  - Description: Modifies the details of an existing project. Users can only modify their own projects, unless they are an admin.
+  - Authorization required: Yes.
+  - Request body:
+    - `project_name` (string): Name of the project to modify.
+    - `created_at` (string): UTC datestring at time of project creation.
+    - `project_changes` (dict): Project changes to apply.
+  - Responses:
+    - 200: Successfully modified project details.
+    - 400: Bad request.
+
+- POST `/get-project`
+  - Description: Retrieves the details of a specified project.
+  - Authorization required: No.
+  - Request body:
+    - `project_name` (string): Name of the project.
+    - `created_at` (string): UTC datestring at time of project creation.
+  - Responses:
+    - 200: Successfully returned project details.
+    - 404: Project not found.
+
+- POST `/get-all-projects`
+  - Description: Retrieves a list of all existing projects from the DynamoDB table.
+  - Authorization required:  No.
+  - Request body: None.
+  - Responses:
+    - 200: Return a JSON of all projects.
+
+- POST `/get-user-projects`
+  - Description: Retrieves a list of all projects created by a specified user.
+  - Authorization required: No.
+  - Request body:
+    - `user_id` (string): Auth0 user 'sub' of the user's projects we want to retrieve.
+  - Responses:
+    - 200: Return a JSON of project details.
+    - 400: Missing required key `user_id`.
+
+- POST `/add-project-data`
+  - Description: Updates a project with the filenames of newly taken exposures. This endpoint is used by observatories to track the completion progress of a project.
+  - Authorization required: No.
+  - Request body:
+    - `project_name` (string): Name of the project to update exposures progress.
+    - `created_at` (string): UTC datestring at time of project creation.
+    - `exposure_index` (int): Index of the most recently taken exposure.
+    - `base_filename` (string): Name of the image taken to add to the project details.
+  - Responses:
+    - 200: Successfully updated project.
+    - 500: Failed to update project in DynamoDB.
+
+- POST `/add-project-event`
+  - Description: Adds a calendar event to the details of a project.
+  - Authorization required: No.
+  - Request body:
+    - `project_name` (string): Name of the project to add calendar events to.
+    - `created_at` (string): UTC datestring at time of project creation.
+    - `event_id` (string): Id of the calendar event to add.
+  - Responses:
+    - 200: Successfully associated event with project.
+    - 200: Event already associated with project.
+
+- POST `/delete-project`
+  - Description: Deletes a project from the DynamoDB table.
+  - Authorization required: Yes.
+  - Request body:
+    - `project_name` (string): Name of the project to delete.
+    - `created_at` (string): UTC datestring at time of project creation.
+    - `requester_id` (string): Auth0 user 'sub' of user requesting deletion.
+    - `user_id` (string): Auth0 user 'sub' of user who created project.
+  - Responses:
+    - 200: Successfully deleted project.
+    - 403: Unauthorized request.
+
+## License
