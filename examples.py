@@ -5,8 +5,6 @@ All endpoints are handled at the base API URL
 "https://projects.photonranch.org/{stage}",
 here {stage} is the development stage in [test, dev, prod].
 
-Currently, both the production and development URLS point to dev.
-
 All projects endpoints:
 /new-project
 /modify-project

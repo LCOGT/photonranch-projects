@@ -167,7 +167,7 @@ For examples using these endpoints with Python, see `examples.py`.
     - `project_name` (string): Name of the project to create.
     - `created_at` (string): UTC datestring at time of project creation.
     - `user_id` (string): Auth0 user 'sub' of the user creating the project.
-    - `new_project` (dict):
+    - `new_project` (dict): Full details of the project being created.
   - Responses:
     - 200: Successfully added new project.
     - 400: Missing required key in `[project_name, user_id, created_at]`.
@@ -243,5 +243,43 @@ For examples using these endpoints with Python, see `examples.py`.
   - Responses:
     - 200: Successfully deleted project.
     - 403: Unauthorized request.
+
+### Example Requests
+
+The following example demonstrates how to use the `/add-project-data` endpoint, the endpoint observatories use to update a project with the exposure completion status.
+
+```python
+import requests, json
+    
+url = "https://projects.photonranch.org/dev/add-project-data"
+request_body = json.dumps({
+
+  # A project is uniquely specified by the pair of values: project_name and created_at. 
+  "project_name": "M31 Example Project",
+  "created_at": "2022-07-01T23:45:37Z",
+
+  # Specify which exposure request is being added to the project data.
+  "exposure_index": 0,
+  "base_filename": "dht-sq11-20220701-00001"
+  })
+
+response = requests.post(url, request_body)
+print(response.json()) 
+```
+
+This example demonstrates how to use the `/get-project` endpoint to obtain the details of a project.
+
+```python
+import requests, json
+
+url = "https://projects.photonranch.org/dev/get-project"
+request_body = json.dumps({
+  "project_name": "M31 Example Project",
+  "created_at": "dht-sq11-20220701-00001",
+})
+
+response = requests.post(url, request_body).json()
+print(json.dumps(response, indent=2))
+```
 
 ## License
