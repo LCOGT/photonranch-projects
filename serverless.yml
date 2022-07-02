@@ -31,7 +31,7 @@ custom:
 
   # Since lambda runs on a linux instance, we need to zip the requirements in a linux docker container.
   pythonRequirements:
-    dockerizePip: true
+    dockerizePip: non-linux
     useDownloadCache: false 
     useStaticCache: false
 
@@ -43,8 +43,8 @@ custom:
 
 provider:
   name: aws
-  stage: ${opt:stage, "dev"}
-  runtime: python3.7
+  stage: ${opt:stage, "test"}
+  runtime: python3.9
   region: us-east-1
   environment: 
     PROJECTS_TABLE: ${self:custom.projectsTable}
@@ -144,17 +144,6 @@ resources: # CloudFormation template syntax from here on.
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
-          #- IndexName: site-end-index
-            #KeySchema:
-              #- AttributeName: site
-                #KeyType: HASH
-              #- AttributeName: end
-                #KeyType: RANGE
-            #Projection:
-              #ProjectionType: ALL
-            #ProvisionedThroughput:
-              #ReadCapacityUnits: 1
-              #WriteCapacityUnits: 1
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
@@ -162,7 +151,6 @@ resources: # CloudFormation template syntax from here on.
 functions:
   authorizerFunc: 
     handler: authorizer.auth
-    cors: true
   addNewProject:
     handler: handler.addNewProject
     events:
