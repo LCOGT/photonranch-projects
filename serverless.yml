@@ -15,7 +15,8 @@ plugins:
 
 custom:
 
-  projectsTable: projects-${self:custom.stage.${self:provider.stage}}
+  # define the name for the projects dynamodb table
+  projectsTable: projects-${self:provider.stage}
 
   # Enable point-in-time-recovery
   pitr:
@@ -25,7 +26,7 @@ custom:
   # This is the 'variable' for the customDomain.basePath value, based on the stage.
   # Run as `sls deploy --stage <stage_name>`
   stage:
-    prod: prod
+    prod: projects
     dev: dev
     test: test 
 
@@ -160,17 +161,7 @@ functions:
           #authorizer:
             #name: authorizerFunc
             #resultTtlInSeconds: 0 # Don't cache the policy or other tasks will fail!
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
   modifyProject:
     handler: handler.modify_project_handler
     events:
@@ -187,51 +178,21 @@ functions:
           #authorizer:
             #name: authorizerFunc
             #resultTtlInSeconds: 0 # Don't cache the policy or other tasks will fail!
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
   addProjectData:
     handler: handler.addProjectData
     events:
       - http:
           path: add-project-data
           method: post
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
   addProjectEvent:
     handler: handler.addProjectEvent
     events:
       - http:
           path: add-project-event
           method: post
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
   deleteProject:
     handler: handler.deleteProject
     events:
@@ -241,34 +202,14 @@ functions:
           authorizer:
             name: authorizerFunc
             resultTtlInSeconds: 0 # Don't cache the policy or other tasks will fail!
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
   getAllProjects:
     handler: handler.getAllProjects
     events:
       - http:
           path: get-all-projects
           method: post
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
   getUserProjects:
     handler: handler.getUserProjects
     events:
@@ -278,14 +219,4 @@ functions:
           #authorizer:
             #name: authorizerFunc
             #resultTtlInSeconds: 0 # Don't cache the policy or other tasks will fail!
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Access-Control-Allow-Origin
-              - Access-Control-Allow-Credentials
+          cors: true
