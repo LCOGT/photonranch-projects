@@ -2,7 +2,7 @@ name: Deploy Script
 
 on:
   push:
-    branches: [main, dev, test]
+    branches: [main, dev]
       
 jobs:
   deploy:
@@ -50,7 +50,7 @@ jobs:
     - name: Set up deployment stage name
       id: deployment-stage
       run: |
-        echo "DEPLOY_STAGE=${{ fromJSON('{"main":"prod","dev":"dev","test":"test"}')[github.ref_name] }}" >> $GITHUB_ENV
+        echo "DEPLOY_STAGE=${{ fromJSON('{"main":"prod","dev":"dev"}')[github.ref_name] }}" >> $GITHUB_ENV
     
     - name: Serverless Deploy
       run: serverless deploy --stage $DEPLOY_STAGE
