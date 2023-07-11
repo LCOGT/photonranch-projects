@@ -270,7 +270,7 @@ import requests, json
 url = "https://projects.photonranch.org/dev/get-project"
 request_body = json.dumps({
   "project_name": "M31 Example Project",
-  "created_at": "dht-sq11-20220701-00001",
+  "created_at": "2023-07-11T05:37:40Z",
 })
 
 response = requests.post(url, request_body).json()
