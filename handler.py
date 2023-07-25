@@ -111,6 +111,7 @@ def modify_project(project_name: str, created_at: str, project_changes: dict):
     updated_project["project_targets"] = project_changes["project_targets"]
     updated_project["project_sites"] = project_changes["project_sites"]
     updated_project["scheduled_with_events"] = project_changes["scheduled_with_events"]
+    updated_project["project_priority"] = project_changes["project_priority"]
 
     # A tricky detail is how to keep track of existing project data for 
     # exposure requests that have been modified. 
