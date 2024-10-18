@@ -158,11 +158,7 @@ Project requests are handled at the base URL `https://projects.photonranch.org/{
 - POST `/new-project`
   - Description: Adds a new project to the projects database.
   - Authorization required: No.
-  - Request body:
-    - `project_name` (string): Name of the project to create.
-    - `created_at` (string): UTC datestring at time of project creation.
-    - `user_id` (string): Auth0 user 'sub' of the user creating the project.
-    - `new_project` (dict): Full details of the project being created.
+  - Request body: project dict, which must include keys `project_name`, `created_at`, and `user_id` (along with the rest of the project as defined above).
   - Responses:
     - 200: Successfully added new project.
     - 400: Missing required key in `[project_name, user_id, created_at]`.
