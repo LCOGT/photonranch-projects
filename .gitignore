@@ -22,7 +22,9 @@ var/
 # Other
 secrets.json
 public_key
+public_key.txt
 calendar-backend.public_key
+calendar-backend.public_key.txt
 venv
 node_modules
 .vscode/
