@@ -24,10 +24,10 @@ jobs:
     - name: Install Serverless Framework
       run: npm install -g serverless
 
-    # public_key.txt and secrets.json both used for api auth guards using Auth0
+    # public_key and secrets.json both used for api auth guards using Auth0
     - name: Create public_key file
       run: |
-        cat > /home/runner/work/photonranch-projects/photonranch-projects/public_key.txt << EOF
+        cat > /home/runner/work/photonranch-projects/photonranch-projects/public_key << EOF
         -----BEGIN CERTIFICATE-----
         ${{ secrets.AUTH0_PUBLIC_KEY }}
         -----END CERTIFICATE-----
