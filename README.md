@@ -229,8 +229,6 @@ Project requests are handled at the base URL `https://projects.photonranch.org/{
   - Request body:
     - `project_name` (string): Name of the project to delete.
     - `created_at` (string): UTC datestring at time of project creation.
-    - `requester_id` (string): Auth0 user 'sub' of user requesting deletion.
-    - `user_id` (string): Auth0 user 'sub' of user who created project.
   - Responses:
     - 200: Successfully deleted project.
     - 403: Unauthorized request.
