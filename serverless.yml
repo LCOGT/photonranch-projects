@@ -203,6 +203,13 @@ functions:
             name: authorizerFunc
             resultTtlInSeconds: 0 # Don't cache the policy or other tasks will fail!
           cors: true
+  deleteSchedulerProjects:
+    handler: handler.deleteSchedulerProjects
+    events:
+      - http:
+          path: delete-scheduler-projects
+          method: post
+          cors: true
   getAllProjects:
     handler: handler.getAllProjects
     events:

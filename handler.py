@@ -577,3 +577,50 @@ def deleteProject(event, context):
     print(f"success deleting project; message: {message}")
     return create_response(200, message)
 
+
+def deleteSchedulerProjects(event, context):
+    """Special delete method: intended only for clearing expired scheduler outputs
+    
+    Args:
+        event.body.project_ids (list or str): IDs for all projects to delete.
+            Each ID is formatted {project_name}#{created_at}.
+    
+    Returns:
+        200 status code with successful project deletion and the following:
+            successful_delete_count: number of projects deleted successfully
+            failed_delete_count: number of projects that failed to delete
+            failed_ids: list of IDs for projects that failed to delete
+    """
+    request_body = json.loads(event.get("body", "{}"))
+    
+    table = dynamodb.Table(projects_table)
+    ids_to_delete = request_body.get("project_ids", [])
+    failed_to_delete = []
+
+    for id in ids_to_delete:
+        project_name, created_at = id.split("#", 1)
+        try:
+            table.delete_item(
+                Key={
+                    "project_name": project_name,
+                    "created_at": created_at
+                },
+                ConditionExpression="origin = :scheduler_origin",
+                ExpressionAttributeValues={
+                    ":scheduler_origin": "LCO"
+                }
+            )
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            print(f"Error deleting project {id}: {e}")
+            if error_code == "ConditionalCheckFailedException":
+                print(f"Failed to delete project {id} because origin is not LCO.")
+            failed_to_delete.append(id)
+
+    response_message = {
+        "successful_delete_count": len(ids_to_delete) - len(failed_to_delete),
+        "failed_delete_count": len(failed_to_delete),
+        "failed_ids": failed_to_delete,
+        "message": "Delete finished"
+    }
+    return create_response(200, json.dumps(response_message))
